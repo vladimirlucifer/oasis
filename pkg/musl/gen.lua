@@ -7,7 +7,7 @@ set('cflags_auto', {
 	'-fdata-sections',
 })
 set('cflags_c99fse', {
-	'-std=c99',
+	'-std=c11',
 	'-nostdinc',
 	'-ffreestanding',
 	'-fexcess-precision=standard',
@@ -94,14 +94,47 @@ local specialcflags = {
 	memset='$cflags $cflags_memops $cflags_nossp',
 	memcmp='$cflags $cflags_memops',
 }
+-- MIMALLOC --
+local remove = {
+  'aligned_alloc.c',
+  'calloc.c',
+  'donate.c',
+  'free.c',
+  'libc_calloc.c',
+  'lite_malloc.c',
+  'malloc.c',
+  'malloc_usable_size.c',
+  'memalign.c',
+  'posix_memalign.c',
+  'replaced.c',
+  'realloc.c',
+  'reallocarray.c',
+  'valloc.c',
+}
+
+
+
+local found = false
 for _, src in pairs(srcs) do
-	table.insert(objs, cc(src, nil, {cflags=specialcflags[src:match('([^/]*)%.[^/.]*$')]}))
+	for _, rm in pairs(remove) do
+    if src:find(rm,1,true) then
+      found = false
+      break
+    end
+  end
+  if not found then
+    found = false
+    table.insert(objs, cc(src, nil, {cflags=specialcflags[src:match('([^/]*)%.[^/.]*$')]}))
+  end
 end
+
+-- table.insert(objs, '$builddir/pkg/mimalloc/libmimalloc.a')
 table.sort(objs)
+-- MIMALLOC --
 
 ar('libc.a', objs)
 file('lib/libc.a', '644', '$outdir/libc.a')
-exe('libc.so', {'ldso/dlstart.c', 'ldso/dynlink.c', objs}, nil, {
+exe('libc.so', {objs, 'ldso/dlstart.c', 'ldso/dynlink.c'}, nil, {
 	cflags='$cflags $cflags_nossp',
 	ldflags='$ldflags -nostdlib -shared -Wl,-e,_dlstart',
 	ldlibs='-lgcc',
